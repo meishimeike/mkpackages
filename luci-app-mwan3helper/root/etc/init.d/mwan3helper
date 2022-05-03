@@ -3,7 +3,6 @@
 
 START=60
 
-DNSMASQ_RESTART=N
 DNS_SERVER="208.67.222.222:443"
 
 start_pdnsd() {
@@ -17,31 +16,35 @@ start_pdnsd() {
     mkdir -p /var/mwan3dns
     echo -ne "pd13\000\000\000\000" > /var/mwan3dns/pdnsd.cache
     chown -R nobody.nogroup /var/mwan3dns
-	fi
+    chmod -R 0777 /var/mwan3dns
+  fi
 	
-	cat > /var/etc/mwan3dns.conf <<EOF
+  cat > /var/etc/mwan3dns.conf <<EOF
 global {
-    perm_cache=1024;        # dns缓存大小，单位KB，建议不要写的太大
-    cache_dir="/var/mwan3dns";     # 缓存文件的位置
+    perm_cache=1024;
+    cache_dir="/var/mwan3dns";
     pid_file = /var/run/mwan3dns.pid;
-    server_ip = 0.0.0.0;        # pdnsd监听的网卡，0.0.0.0是全部网卡
-    server_port=53000;           # pdnsd监听的端口，不要和别的服务冲突即可
+    run_as="nobody";
+    server_ip = 0.0.0.0;
+    server_port=53000;
     status_ctl = on;
-    paranoid=on;                  # 二次请求模式，如果请求主DNS服务器返回的是垃圾地址，就向备用服务器请求
-    query_method=udp_only;      
+    paranoid=on;
+    query_method=tcp_only;   
     neg_domain_pol = off;  
-    par_queries = 400;          # 最多同时请求数
-    min_ttl = 1h;               # DNS结果最短缓存时间
-    max_ttl = 1w;               # DNS结果最长缓存时间
-    timeout = 10;               # DNS请求超时时间，单位秒
+    par_queries = 400;
+    min_ttl = 1h;
+    max_ttl = 1w;
+    timeout = 5;
 }
 
-server {  
+server {
     label = "routine";         
     ip = $DNS_SERVERIP; 
     port = $DNS_SERVERPORT;    
-    timeout = 5;              
-    reject = 74.125.127.102,  # 以下是脏IP，也就是DNS污染一般会返回的结果，如果收到如下DNS结果会触发二次请求（TCP协议一般不会碰到脏IP）
+    timeout = 30;
+    uptest = ping;                                                               
+    ping_timeout=50;            
+    reject = 74.125.127.102,
         74.125.155.102,  
         74.125.39.102,  
         74.125.39.113,  
@@ -104,12 +107,12 @@ server {
 }
 
 server {  
-    label = "special";                  # 这个随便写  
-    ip = 208.67.222.222,208.67.220.220; # 这里为备用DNS服务器的 ip 地址  
-    port = 443;                        # 推荐使用53以外的端口（DNS服务器必须支持） 
+    label = "special";  
+    ip = 208.67.222.222,208.67.220.220;  
+    port = 443; 
     proxy_only = on;
     timeout = 5;  
-}  
+}
 
 source {
 	owner=localhost;
@@ -128,13 +131,13 @@ EOF
   
   [ -d /var/sbin ] || mkdir -p /var/sbin
   [ -f /var/sbin/mwan3dns ] || cp -a /usr/sbin/pdnsd /var/sbin/mwan3dns
-	/var/sbin/mwan3dns -c /var/etc/mwan3dns.conf -d
-	echo "Start MWAN3 Helper DNS"
+  /var/sbin/mwan3dns -c /var/etc/mwan3dns.conf -d
+  echo "Start MWAN3 Helper DNS"
 }
 
 stop_pdnsd() {
-  kill $(pidof mwan3dns) >/dev/null 2>&1 || kill -9 $(ps | grep mwan3dns | grep -v grep | awk '{print $1}') >/dev/null 2>&1
-  echo "Stop MWAN3 Helper DNS"
+  kill $(pidof mwan3dns) >/dev/null 2>&1 | kill -9 $(ps | grep mwan3dns | grep -v grep | awk '{print $1}') >/dev/null 2>&1
+  	echo "Stop MWAN3 Helper DNS"
 }
 
 
@@ -159,7 +162,9 @@ start(){
 conf-dir=/var/etc/dnsmasq-mwan3.d
 EOF
     /etc/init.d/dnsmasq restart
-  fi
+  else
+    stop
+fi
 }
 
 stop(){
