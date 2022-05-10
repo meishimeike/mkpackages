@@ -1,0 +1,152 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2022 Meiage <kmmeiage@gmail.com>
+
+START=90
+App=redsocks2
+PID_FILE=/var/run/$APP.pid
+CFG_FILE=/var/etc/redsocks2.conf
+
+if_enabled() {
+	local cfg="$1"
+	config_get_bool enabled "$cfg" 'enabled' '0'
+	if [ "$enabled" = "0" ];then
+		echo "redsocks2 is not enabled,Exit now."
+		exit 1
+	fi
+}
+
+gen_config_base() {
+	local cfg=$1
+	echo "base {" > $CFG_FILE
+	config_get loglevel "$cfg" 'loglevel'
+	case "$loglevel" in
+		debug)
+			echo "	log_debug = on;" >> $CFG_FILE
+			echo "	log_info = on;" >> $CFG_FILE
+			;;
+		info)
+			echo "	log_debug = off;" >> $CFG_FILE
+			echo "	log_info = on;" >> $CFG_FILE
+			;;
+		off)
+			echo "	log_debug = off;" >> $CFG_FILE
+			echo "	log_info = off;" >> $CFG_FILE
+	esac
+	echo "	daemon = on;" >> $CFG_FILE
+	echo "	log = \"file:/var/log/redsocks2.log\";" >> $CFG_FILE
+	echo "	redirector = iptables;" >> $CFG_FILE
+	echo "}" >> $CFG_FILE
+}
+
+gen_config_redirect() {
+	local cfg="$1"
+	config_get local_ip "$cfg" 'local_ip'
+	config_get local_port "$cfg" 'local_port'
+	config_get serverip "$cfg" 'server_ip'
+	config_get serverport "$cfg" 'server_port'
+	config_get proxy_type "$cfg" 'proxy_type'
+	config_get username "$cfg" 'username'
+	config_get password "$cfg" 'password'
+	
+	cat >> $CFG_FILE <<EOF
+redsocks {
+	bind = "$local_ip:$local_port";
+	relay = "$serverip:$serverport";
+	type = $proxy_type;
+	login = "$username";
+	password = "$password";
+	autoproxy = 0;
+}
+
+ipcache {
+	cache_size = 4; 
+	stale_time = 900;
+	port_check = 1;
+	cache_file = "/tmp/ipcache.txt";
+	autosave_interval = 3600;
+}
+EOF
+}
+
+
+gen_config_dns() {
+	local cfg="$1"	
+	config_get enabled "$cfg" 'enabled'
+	config_get localdns "$cfg" 'local_dns'
+	config_get dnss "$cfg" 'server_dns'
+	
+	if [ "$enabled" == '1' ];then
+		echo "tcpdns {" >> $CFG_FILE
+		echo "	bind = \"$localdns\";" >> $CFG_FILE
+		let c=0
+		for dns in $dnss
+		do
+			c=$(($c+1))
+   			dnses="tcpdns$c = \"$dns\""
+			echo "	$dnses;"  >> $CFG_FILE
+		done
+		echo "	timeout = 4;" >> $CFG_FILE
+		echo "}" >> $CFG_FILE
+	fi
+}
+
+redsocks2_iptables_start() {
+	local cfg="$1"
+	config_get localport "$cfg" 'local_port'
+	config_get enipset "$cfg" 'enipset'
+	config_get ipsetname "$cfg" 'ipsetname'
+	config_get selfproxy "$cfg" 'selfproxy' '0'
+	config_get throughproxy "$2" 'throughproxy' '0'
+	config_get serverdns "$2" 'server_dns' '0'
+
+	iptables -t nat -N REDSOCKS2
+	iptables -t nat -A REDSOCKS2 -d 0.0.0.0/8 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 10.0.0.0/8 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 127.0.0.0/8 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 169.254.0.0/16 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 172.16.0.0/12 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 192.168.0.0/16 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 224.0.0.0/4 -j RETURN
+	iptables -t nat -A REDSOCKS2 -d 240.0.0.0/4 -j RETURN
+
+	if [ "$throughproxy" = '1' ];then
+		local dnsip=DNS_SERVERIP=${serverdns%:*}
+		iptables -t nat -A REDSOCKS2 -p tcp -d $dnsip -j REDIRECT --to-ports "$localport"
+	fi
+
+	if [ "$enipset" = '1' ];then
+		iptables -t nat -A REDSOCKS2 -p tcp -m set --match-set $ipsetname dst -j REDIRECT --to-ports "$localport"
+	else
+		iptables -t nat -A REDSOCKS2 -p tcp -j REDIRECT --to-ports "$localport"
+	fi
+	
+	iptables -t nat -I prerouting_rule -j REDSOCKS2
+	if [ "$selfproxy" = '1' ];then
+		iptables -t nat -I OUTPUT -p tcp -m multiport --dports 80,443 -j REDSOCKS2
+	fi
+}
+
+redsocks2_iptables_stop(){
+	iptables -t nat -D prerouting_rule -j REDSOCKS2 &> /dev/null
+	iptables -t nat -D OUTPUT -p tcp -m multiport --dports 80,443 -j REDSOCKS2 &> /dev/null
+	iptables -t nat -F REDSOCKS2 &> /dev/null
+	sleep 1
+	iptables -t nat -X REDSOCKS2 &> /dev/null
+}
+
+start() {
+	config_load 'redsocks2'
+	[ ! -d  "/var/etc" ] && mkdir /var/etc
+	config_foreach if_enabled 'redsocks2_base'
+	config_foreach gen_config_base 'redsocks2_base'
+	config_foreach gen_config_redirect 'redsocks2_redirect'
+	config_foreach gen_config_dns 'redsocks2_tcpdns'
+	/usr/sbin/redsocks2 -c $CFG_FILE -p $PID_FILE
+	config_foreach redsocks2_iptables_start 'redsocks2_redirect' 'redsocks2_tcpdns'
+}
+
+stop() {
+	config_load 'redsocks2'
+	service_stop /usr/sbin/redsocks2 && rm -rf $PID_FILE
+	redsocks2_iptables_stop
+}

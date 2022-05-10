@@ -1,0 +1,19 @@
+
+config redsocks2_base
+	option enabled '0'
+	option loglevel 'info'
+
+config redsocks2_redirect
+	option local_port '11111'
+	option selfproxy '0'
+	option username ''
+	option password ''
+	option server_port '3128'
+	option local_ip '0.0.0.0'
+	option proxy_type 'http-connect'
+	option server_ip '0'
+	option enipset '0'
+	option ipsetname 'cn'
+
+config redsocks2_tcpdns
+

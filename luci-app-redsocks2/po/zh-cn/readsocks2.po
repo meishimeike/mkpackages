@@ -1,0 +1,67 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: zh_CN\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+msgid "Basic Settings"
+msgstr "基础设置"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "Log Level"
+msgstr "日志等级"
+
+msgid "Proxy Settings"
+msgstr "代理设置"
+
+msgid "Local IP"
+msgstr "本地 IP"
+
+msgid "Local Port"
+msgstr "本地端口"
+
+msgid "Proxy Server IP"
+msgstr "代理服务器IP"
+
+msgid "Proxy Server Port"
+msgstr "代理服务器端口"
+
+msgid "Proxy Server Type"
+msgstr "代理服务器类型"
+
+msgid "Username"
+msgstr "用户名"
+
+msgid "Password"
+msgstr "密码"
+
+msgid "Enable Ipset Mode"
+msgstr "开启ipset代理"
+
+msgid "Ipset name"
+msgstr "ipset名称"
+
+msgid "Enable self proxy"
+msgstr "开启路由器自身代理"
+
+msgid "TCP DNS Settings"
+msgstr "TCP DNS设置"
+
+msgid "Local DNS"
+msgstr "本地DNS"
+
+msgid "Server DNS"
+msgstr "服务器DNS"
+
+msgid "Connect through a proxy"
+msgstr "通过代理连接"
+
+msgid "Ipset connect through a proxy"
+msgstr "指定Ipset列表通过代理连接"
+
