@@ -76,9 +76,4 @@ o.default     = "208.67.222.222:443"
 o=s:option(Flag,"throughproxy",translate("Connect through a proxy"))
 o:depends({enabled="1"})
 
-local apply = luci.http.formvalue("cbi.apply")
-if apply then
-	io.popen("/etc/init.d/redsocks2 restart >/dev/null 2>&1 &")
-end
-
 return m
