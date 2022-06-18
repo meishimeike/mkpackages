@@ -24,7 +24,6 @@ global {
     perm_cache=1024;
     cache_dir="/var/mwan3dns";
     pid_file = /var/run/mwan3dns.pid;
-    run_as="nobody";
     server_ip = 0.0.0.0;
     server_port=53000;
     status_ctl = on;
@@ -42,8 +41,7 @@ server {
     ip = $DNS_SERVERIP; 
     port = $DNS_SERVERPORT;    
     timeout = 30;
-    uptest = ping;                                                               
-    ping_timeout=50;            
+    uptest = none;            
     reject = 74.125.127.102,
         74.125.155.102,  
         74.125.39.102,  
@@ -111,7 +109,10 @@ server {
     ip = 208.67.222.222,208.67.220.220;  
     port = 443; 
     proxy_only = on;
-    timeout = 5;  
+    timeout = 5;
+    uptest = ping;                                                               
+    ping_timeout = 100;
+    interval = 15m;
 }
 
 source {
